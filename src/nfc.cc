@@ -36,7 +36,11 @@ namespace {
 
         void stop() {
             run = false;
-            while(claimed);
+
+            //while(claimed) {
+            //   fprintf(stderr, "Device closing claimed\n");
+            //}
+
             if(pnd) {
                 nfc_abort_command(pnd);
                 nfc_close(pnd);
@@ -158,31 +162,52 @@ namespace {
         }
 
         void Execute(const AsyncProgressWorker::ExecutionProgress& progress) {
-            while(baton->run && nfc_initiator_select_passive_target(baton->pnd, nmMifare, NULL, 0, &baton->nt) > 0) {
-                baton->claimed = true;
-                tag = new NFCCard();
-                if(baton->run) ReadTag(tag);
-                baton->claimed = false;
 
-                progress.Send(NULL, 0);
+            //SetErrorMessage("First Message");
+            //SetErrorMessage("Second Message");
 
-                int timeout = 5 * 1000; //5 second timeout
-                while(baton->run && tag && --timeout > 0) {
-                    usleep(1000);
-                }
-                if(timeout <= 0) {
-                    //unresponsive VM, node was likely killed while this devide was not stopped.
-                    baton->stop();
-                    baton->run = false;
-                    fprintf(stderr, "Node was stopped while some NFC devices where still started.\n");
+            while(baton->run) {
+            	int ret = nfc_initiator_select_passive_target(baton->pnd, nmMifare, NULL, 0, &baton->nt);
+
+		if (ret > 0) {
+                    baton->claimed = true;
+                    tag = new NFCCard();
+                    if(baton->run) {
+                        ReadTag(tag);
+                    }
+                    baton->claimed = false;
+                    
+                    progress.Send(NULL, 0);
+                    
+                    int timeout = 5 * 1000; //5 second timeout
+
+                    while(baton->run && tag && --timeout > 0) {
+                        usleep(1000);
+                    }
+
+                    if(timeout <= 0) {
+                        //unresponsive VM, node was likely killed while this devide was not stopped.
+                        baton->stop();
+                        baton->run = false;
+                        fprintf(stderr, "Node was stopped while some NFC devices where still started.\n");
+                    }
+		}
+
+                if (ret < 0) {
+                  baton->run = false;
+                  baton->claimed = false;
+            	  fprintf(stderr, nfc_strerror(baton->pnd));
                 }
             }
+
+            //SetErrorMessage("Exit Loop Execute");
         }
 
         #define MAX_DEVICE_COUNT 16
         #define MAX_FRAME_LENGTH 264
 
         void ReadTag(NFCCard *tag) {
+            fprintf(stderr, "Start read");
             unsigned long cc, n;
             char *bp, result[BUFSIZ];
             const char *sp;
@@ -195,12 +220,14 @@ namespace {
             char uid[3 * sizeof baton->nt.nti.nai.abtUid];
             bzero(uid, sizeof uid);
 
+            fprintf(stderr, "Start for 1");
             for (n = 0, bp = uid, sp = ""; n < cc; n++, bp += strlen(bp), sp = ":") {
                 snprintf(bp, sizeof uid - (bp - uid), "%s%02x", sp, baton->nt.nti.nai.abtUid[n]);
             }
             tag->SetUID(uid);
             tag->SetType(baton->nt.nti.nai.abtAtqa[1]);
 
+            fprintf(stderr, "Start switch");
             switch (baton->nt.nti.nai.abtAtqa[1]) {
                 case 0x04:
                 {
@@ -341,10 +368,12 @@ namespace {
                 default:
                     break;
             }
+            fprintf(stderr, "End read");
         }
 
         void HandleProgressCallback(const char *_tag, size_t size) {
             Nan::HandleScope scope;
+            fprintf(stderr, "Start Progress");
 
             Local<Object> object = Nan::New<Object>();
             tag->AddToNodeObject(object);
@@ -356,7 +385,9 @@ namespace {
             argv[1] = object;
             
             Local<Object> self = GetFromPersistent("self").As<Object>();
+            fprintf(stderr, "Call cb");
             Nan::MakeCallback(self, "emit", 2, argv);
+            fprintf(stderr, "End Progress");
         }
 
       private:
