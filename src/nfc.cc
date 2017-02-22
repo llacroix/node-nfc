@@ -207,7 +207,7 @@ namespace {
         #define MAX_FRAME_LENGTH 264
 
         void ReadTag(NFCCard *tag) {
-            fprintf(stderr, "Start read");
+            //fprintf(stderr, "Start read");
             unsigned long cc, n;
             char *bp, result[BUFSIZ];
             const char *sp;
@@ -220,14 +220,14 @@ namespace {
             char uid[3 * sizeof baton->nt.nti.nai.abtUid];
             bzero(uid, sizeof uid);
 
-            fprintf(stderr, "Start for 1");
+            //fprintf(stderr, "Start for 1");
             for (n = 0, bp = uid, sp = ""; n < cc; n++, bp += strlen(bp), sp = ":") {
                 snprintf(bp, sizeof uid - (bp - uid), "%s%02x", sp, baton->nt.nti.nai.abtUid[n]);
             }
             tag->SetUID(uid);
             tag->SetType(baton->nt.nti.nai.abtAtqa[1]);
 
-            fprintf(stderr, "Start switch");
+            //fprintf(stderr, "Start switch");
             switch (baton->nt.nti.nai.abtAtqa[1]) {
                 case 0x04:
                 {
@@ -368,12 +368,12 @@ namespace {
                 default:
                     break;
             }
-            fprintf(stderr, "End read");
+            //fprintf(stderr, "End read");
         }
 
         void HandleProgressCallback(const char *_tag, size_t size) {
             Nan::HandleScope scope;
-            fprintf(stderr, "Start Progress");
+            //fprintf(stderr, "Start Progress");
 
             Local<Object> object = Nan::New<Object>();
             tag->AddToNodeObject(object);
@@ -385,9 +385,9 @@ namespace {
             argv[1] = object;
             
             Local<Object> self = GetFromPersistent("self").As<Object>();
-            fprintf(stderr, "Call cb");
+            //fprintf(stderr, "Call cb");
             Nan::MakeCallback(self, "emit", 2, argv);
-            fprintf(stderr, "End Progress");
+            //fprintf(stderr, "End Progress");
         }
 
       private:
